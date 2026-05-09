@@ -22,6 +22,7 @@ export type GameScreen =
   | "home"
   | "settings"
   | "scanning"
+  | "scan-transition"
   | "question"
   | "result-correct"
   | "result-wrong"
@@ -47,6 +48,7 @@ interface GameContextValue extends GameState {
   goToSettings: () => void;
   goHome: () => void;
   scanBarcode: () => void;
+  finishTransition: () => void;
   selectAnswer: (index: number) => void;
   nextScan: () => void;
   setTotalTime: (seconds: number) => void;
@@ -155,12 +157,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (prev.screen !== "scanning") return prev;
       const question = getRandomQuestion(prev.usedQuestionIds);
       if (!question) return prev;
+      // Go to transition first, then question
       return {
         ...prev,
-        screen: "question",
+        screen: "scan-transition",
         currentQuestion: question,
         selectedAnswer: null,
       };
+    });
+  }, []);
+
+  const finishTransition = useCallback(() => {
+    setState((prev) => {
+      if (prev.screen !== "scan-transition") return prev;
+      return { ...prev, screen: "question" };
     });
   }, []);
 
@@ -203,11 +213,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      setState((prev) => {
-        // Only active during scanning screen
-        if (prev.screen !== "scanning") return prev;
-        return prev;
-      });
+      // Only active during scanning screen — ignore during transition
+      setState((prev) => prev);
 
       if (e.key === "Enter") {
         // Scanner completed — trigger scan
@@ -255,6 +262,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         goToSettings,
         goHome,
         scanBarcode,
+        finishTransition,
         selectAnswer,
         nextScan,
         setTotalTime,
