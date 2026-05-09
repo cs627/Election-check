@@ -1,7 +1,7 @@
 // ============================================================
 // IES Supermarket Quiz — Main Page (Screen Router)
 // Kiosk portrait layout, max 480px centered
-// ScanTransition renders as a full-screen overlay above everything
+// Scan → directly to question (no full-screen transition overlay)
 // Admin button (⚙️) in top-right corner for data management
 // ============================================================
 
@@ -11,41 +11,18 @@ import { QuestionScreen } from "@/components/screens/QuestionScreen";
 import { CorrectResultScreen, WrongResultScreen } from "@/components/screens/ResultScreen";
 import { ScanningScreen } from "@/components/screens/ScanningScreen";
 import { SettingsScreen } from "@/components/screens/SettingsScreen";
-import { ScanTransition } from "@/components/ScanTransition";
 import { AdminPanel } from "@/components/AdminPanel";
 import { GameProvider, useGame } from "@/contexts/GameContext";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
-
-type TransitionPhase = "laser" | "reveal" | "burst" | "hold" | "exit";
+import { useState } from "react";
 
 function ScreenRouter() {
-  const { screen, currentQuestion, currentProduct, finishTransition, reloadData } = useGame();
+  const { screen, reloadData } = useGame();
   const [showAdmin, setShowAdmin] = useState(false);
-  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>("laser");
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  // Manage transition phases
-  useEffect(() => {
-    if (screen === "scan-transition") {
-      setTransitionPhase("laser");
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [
-        setTimeout(() => setTransitionPhase("reveal"), 500),
-        setTimeout(() => setTransitionPhase("burst"), 900),
-        setTimeout(() => setTransitionPhase("hold"), 1100),
-        setTimeout(() => setTransitionPhase("exit"), 2400),
-        setTimeout(() => finishTransition(), 2800),
-      ];
-    }
-    return () => timersRef.current.forEach(clearTimeout);
-  }, [screen, finishTransition]);
-
-  const baseScreen = screen === "scan-transition" ? "scanning" : screen;
 
   return (
     <div className="relative w-full min-h-screen">
-      {/* Admin button — visible on home screen only */}
+      {/* Admin button — visible on home/settings screens only */}
       {(screen === "home" || screen === "settings") && (
         <button
           onClick={() => setShowAdmin(true)}
@@ -55,37 +32,24 @@ function ScreenRouter() {
         </button>
       )}
 
-      {/* Base screen layer */}
+      {/* Screen router with smooth transitions */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={baseScreen}
-          initial={{ opacity: 0, y: 16 }}
+          key={screen}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -16 }}
-          transition={{ duration: 0.22, type: "tween" }}
+          exit={{ opacity: 0, y: -14 }}
+          transition={{ duration: 0.2, type: "tween" }}
           className="w-full min-h-screen"
         >
-          {baseScreen === "home"           && <HomeScreen />}
-          {baseScreen === "settings"       && <SettingsScreen />}
-          {baseScreen === "scanning"       && <ScanningScreen />}
-          {baseScreen === "question"       && <QuestionScreen />}
-          {baseScreen === "result-correct" && <CorrectResultScreen />}
-          {baseScreen === "result-wrong"   && <WrongResultScreen />}
-          {baseScreen === "game-over"      && <GameOverScreen />}
+          {screen === "home"           && <HomeScreen />}
+          {screen === "settings"       && <SettingsScreen />}
+          {screen === "scanning"       && <ScanningScreen />}
+          {screen === "question"       && <QuestionScreen />}
+          {screen === "result-correct" && <CorrectResultScreen />}
+          {screen === "result-wrong"   && <WrongResultScreen />}
+          {screen === "game-over"      && <GameOverScreen />}
         </motion.div>
-      </AnimatePresence>
-
-      {/* Scan Transition overlay */}
-      <AnimatePresence>
-        {screen === "scan-transition" && currentQuestion && (
-          <ScanTransition
-            key="scan-transition"
-            question={currentQuestion}
-            product={currentProduct}
-            phase={transitionPhase}
-            onComplete={finishTransition}
-          />
-        )}
       </AnimatePresence>
 
       {/* Admin Panel */}

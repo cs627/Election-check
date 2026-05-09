@@ -180,9 +180,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const question = getRandomQuestion(gameData.questions, prev.usedQuestionIds);
       if (!question) return prev;
 
+      // Go directly to question — no full-screen transition overlay
       return {
         ...prev,
-        screen: "scan-transition",
+        screen: "question",
         currentQuestion: question,
         currentProduct: product,
         selectedAnswer: null,
