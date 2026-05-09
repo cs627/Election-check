@@ -1,51 +1,36 @@
 // ============================================================
 // IES Supermarket Quiz — Scan Transition Animation
-// Spectacular product reveal: laser scan → product flies in →
+// Product-aware: shows the ACTUAL scanned product
+// Spectacular reveal: laser scan → product flies in →
 // spotlight burst → difficulty badge → transition to question
+//
+// FIX: All multi-keyframe animations use type:"tween" (not spring)
+// Spring only used for simple 2-frame (from→to) transitions
 // ============================================================
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
-import { Question, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from "@/lib/gameData";
+import { useEffect } from "react";
+import { Question, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from "@/lib/dataStore";
+import { Product } from "@/lib/dataStore";
 
-// Cute product images — randomly assigned per scan
-const PRODUCTS = [
-  {
-    url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/product-apple-JsmtQrCTCVQSvDMzQJ3gJb.webp",
-    name: "新鮮蘋果",
-    emoji: "🍎",
-  },
-  {
-    url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/product-milk-ZantnDy97oEK9r7fXXGz93.webp",
-    name: "新鮮牛奶",
-    emoji: "🥛",
-  },
-  {
-    url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/product-bread-MdBxZM4XNDR8CSJ7hQz5Fv.webp",
-    name: "香脆麵包",
-    emoji: "🍞",
-  },
-  {
-    url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/product-juice-eGpKXGjCkYcKGJHkQfJ4UM.webp",
-    name: "橙汁飲品",
-    emoji: "🍊",
-  },
-  {
-    url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/product-cereal-nnEJdGrje2Gtjnncomjqmg.webp",
-    name: "早餐麥片",
-    emoji: "🥣",
-  },
-];
+// Fallback emoji images for products without custom imageUrl
+const EMOJI_BG_COLORS: Record<string, string> = {
+  "🍎": "#FFE0E0", "🥛": "#E8F4FF", "🍞": "#FFF3E0", "🍊": "#FFF0D0",
+  "🥣": "#F0F8E8", "🥚": "#FFFDE8", "🍌": "#FFFBE0", "🍅": "#FFE8E8",
+  "🥔": "#F5EDD8", "🍫": "#F0E8E0", "🍪": "#FFF0E0", "🥫": "#E8F0FF",
+  "🍝": "#FFF5E0", "🧀": "#FFFBE0", "🍯": "#FFF3D0", "🍵": "#E8F5E8",
+  "💧": "#E8F4FF", "🥕": "#FFE8D0", "🥦": "#E8F5E8",
+};
 
-// Sparkle particle
+// Sparkle particle — tween only (multi-keyframe safe)
 function Sparkle({ x, y, color, delay }: { x: number; y: number; color: string; delay: number }) {
   return (
     <motion.div
       className="absolute pointer-events-none"
       style={{ left: `${x}%`, top: `${y}%` }}
-      initial={{ scale: 0, opacity: 1 }}
+      initial={{ scale: 0, opacity: 1, y: 0 }}
       animate={{ scale: [0, 1.5, 0], opacity: [1, 1, 0], y: [0, -30, -60] }}
-      transition={{ duration: 0.8, delay, ease: "easeOut" }}
+      transition={{ duration: 0.8, delay, ease: "easeOut", type: "tween" }}
     >
       <div
         className="w-4 h-4 rounded-full"
@@ -55,7 +40,7 @@ function Sparkle({ x, y, color, delay }: { x: number; y: number; color: string; 
   );
 }
 
-// Radial burst rays
+// Radial burst rays — tween (multi-keyframe safe)
 function BurstRays({ color }: { color: string }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -66,7 +51,7 @@ function BurstRays({ color }: { color: string }) {
           style={{ rotate: `${i * 30}deg` }}
           initial={{ scaleX: 0, opacity: 0 }}
           animate={{ scaleX: [0, 1, 0], opacity: [0, 0.6, 0] }}
-          transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
+          transition={{ duration: 0.6, delay: 0.15, ease: "easeOut", type: "tween" }}
         >
           <div
             className="w-48 h-1.5 rounded-full"
@@ -81,7 +66,7 @@ function BurstRays({ color }: { color: string }) {
   );
 }
 
-// Floating score badge
+// Score badge — simple spring (2 keyframes only)
 function ScoreBadge({ points, color }: { points: number; color: string }) {
   return (
     <motion.div
@@ -92,11 +77,7 @@ function ScoreBadge({ points, color }: { points: number; color: string }) {
     >
       <div
         className="rounded-2xl px-4 py-2 text-center shadow-xl border-b-4"
-        style={{
-          backgroundColor: color,
-          borderColor: color + "aa",
-          boxShadow: `0 8px 24px ${color}60`,
-        }}
+        style={{ backgroundColor: color, borderColor: color + "aa", boxShadow: `0 8px 24px ${color}60` }}
       >
         <p className="text-white text-xs font-black">獲得</p>
         <p className="text-white font-black text-3xl font-orbitron leading-none">+{points}</p>
@@ -106,12 +87,11 @@ function ScoreBadge({ points, color }: { points: number; color: string }) {
   );
 }
 
-// Difficulty ribbon
+// Difficulty ribbon — simple spring (2 keyframes only)
 function DifficultyRibbon({ question }: { question: Question }) {
   const color = DIFFICULTY_COLORS[question.difficulty];
   const label = DIFFICULTY_LABELS[question.difficulty];
-  const stars =
-    question.difficulty === "easy" ? "⭐" : question.difficulty === "medium" ? "⭐⭐" : "⭐⭐⭐";
+  const stars = question.difficulty === "easy" ? "⭐" : question.difficulty === "medium" ? "⭐⭐" : "⭐⭐⭐";
 
   return (
     <motion.div
@@ -131,22 +111,59 @@ function DifficultyRibbon({ question }: { question: Question }) {
   );
 }
 
+// Product display: shows custom image URL or large emoji
+function ProductDisplay({ product, diffColor }: { product: Product; diffColor: string }) {
+  const bgColor = EMOJI_BG_COLORS[product.emoji] || "#F0F8FF";
+
+  if (product.imageUrl) {
+    return (
+      <img
+        src={product.imageUrl}
+        alt={product.nameZH}
+        className="w-52 h-52 object-contain drop-shadow-2xl"
+        style={{ filter: `drop-shadow(0 12px 24px ${diffColor}60)` }}
+        onError={(e) => {
+          // Fallback to emoji if image fails
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="w-52 h-52 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-white/60"
+      style={{
+        backgroundColor: bgColor,
+        filter: `drop-shadow(0 12px 24px ${diffColor}60)`,
+      }}
+    >
+      <span style={{ fontSize: "100px", lineHeight: 1 }}>{product.emoji}</span>
+    </div>
+  );
+}
+
 interface ScanTransitionProps {
   question: Question;
+  product: Product | null;
+  phase: "laser" | "reveal" | "burst" | "hold" | "exit";
   onComplete: () => void;
 }
 
-type Phase = "laser" | "reveal" | "burst" | "hold" | "exit";
-
-export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
-  const [phase, setPhase] = useState<Phase>("laser");
-  const [product] = useState(
-    () => PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)]
-  );
-
+export function ScanTransition({ question, product, phase, onComplete }: ScanTransitionProps) {
   const diffColor = DIFFICULTY_COLORS[question.difficulty];
 
-  // Sparkle positions
+  // Default product display if none matched
+  const displayProduct: Product = product || {
+    id: "default",
+    barcode: "",
+    nameZH: "神秘貨物",
+    nameEN: "Mystery Item",
+    emoji: "📦",
+    imageUrl: "",
+    notes: "",
+  };
+
   const sparkles = [
     { x: 20, y: 20, color: "#FFB800", delay: 0.3 },
     { x: 75, y: 15, color: "#FF6B6B", delay: 0.35 },
@@ -158,25 +175,13 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
     { x: 90, y: 30, color: "#A78BFA", delay: 0.38 },
   ];
 
-  useEffect(() => {
-    // Phase timeline — total ~2.8s for full reveal experience
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => setPhase("reveal"), 500));   // laser → product flies in
-    timers.push(setTimeout(() => setPhase("burst"), 900));    // burst rays + sparkles
-    timers.push(setTimeout(() => setPhase("hold"), 1100));    // hold with badges
-    timers.push(setTimeout(() => setPhase("exit"), 2400));    // exit animation
-    timers.push(setTimeout(() => onComplete(), 2800));        // transition to question
-    return () => timers.forEach(clearTimeout);
-  }, [onComplete]);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
       style={{
-        background:
-          phase === "laser"
-            ? "linear-gradient(180deg, #0d1a2e 0%, #1a3a5c 100%)"
-            : "linear-gradient(180deg, #e8f4ff 0%, #c5e8ff 100%)",
+        background: phase === "laser"
+          ? "linear-gradient(180deg, #0d1a2e 0%, #1a3a5c 100%)"
+          : "linear-gradient(180deg, #e8f4ff 0%, #c5e8ff 100%)",
         transition: "background 0.3s ease",
       }}
     >
@@ -186,50 +191,31 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
           <motion.div
             className="absolute inset-0 flex flex-col items-center justify-center"
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.2, type: "tween" }}
           >
-            {/* Scan frame */}
             <div className="relative w-64 h-64 border-2 border-white/30 rounded-2xl overflow-hidden">
-              {/* Corner brackets */}
-              {[
-                "top-0 left-0 border-t-4 border-l-4",
-                "top-0 right-0 border-t-4 border-r-4",
-                "bottom-0 left-0 border-b-4 border-l-4",
-                "bottom-0 right-0 border-b-4 border-r-4",
-              ].map((cls, i) => (
-                <div
-                  key={i}
-                  className={`absolute w-8 h-8 border-[#29ABE2] ${cls}`}
-                />
+              {["top-0 left-0 border-t-4 border-l-4", "top-0 right-0 border-t-4 border-r-4",
+                "bottom-0 left-0 border-b-4 border-l-4", "bottom-0 right-0 border-b-4 border-r-4"].map((cls, i) => (
+                <div key={i} className={`absolute w-8 h-8 border-[#29ABE2] ${cls}`} />
               ))}
-
-              {/* Animated laser line */}
               <motion.div
                 className="absolute w-full h-1"
                 style={{
-                  background:
-                    "linear-gradient(90deg, transparent, #ff3333, #ff6666, #ff3333, transparent)",
+                  background: "linear-gradient(90deg, transparent, #ff3333, #ff6666, #ff3333, transparent)",
                   boxShadow: "0 0 12px 4px rgba(255,50,50,0.8)",
                 }}
                 initial={{ top: "10%" }}
                 animate={{ top: "90%" }}
-                transition={{ duration: 0.35, ease: "linear" }}
+                transition={{ duration: 0.35, ease: "linear", type: "tween" }}
               />
-
-              {/* Scan grid */}
-              <div
-                className="absolute inset-0 opacity-10"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(0deg, #29ABE2 0, #29ABE2 1px, transparent 1px, transparent 20px), repeating-linear-gradient(90deg, #29ABE2 0, #29ABE2 1px, transparent 1px, transparent 20px)",
-                }}
-              />
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: "repeating-linear-gradient(0deg, #29ABE2 0, #29ABE2 1px, transparent 1px, transparent 20px), repeating-linear-gradient(90deg, #29ABE2 0, #29ABE2 1px, transparent 1px, transparent 20px)",
+              }} />
             </div>
-
             <motion.p
               className="text-white/80 font-black text-lg mt-6 tracking-widest"
               animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 0.4, repeat: Infinity }}
+              transition={{ duration: 0.4, repeat: Infinity, type: "tween" }}
             >
               掃描中... SCANNING
             </motion.p>
@@ -237,7 +223,7 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
         )}
       </AnimatePresence>
 
-      {/* === PHASES 2-4: PRODUCT REVEAL + BURST + HOLD === */}
+      {/* === PHASES 2-4: PRODUCT REVEAL === */}
       <AnimatePresence>
         {(phase === "reveal" || phase === "burst" || phase === "hold" || phase === "exit") && (
           <motion.div
@@ -245,93 +231,57 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.08 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.25, type: "tween" }}
           >
-            {/* Flash white burst at moment of reveal */}
+            {/* Flash burst */}
             {phase === "reveal" && (
               <motion.div
                 className="absolute inset-0 bg-white pointer-events-none z-30"
                 initial={{ opacity: 0.7 }}
                 animate={{ opacity: 0 }}
-                transition={{ duration: 0.35 }}
+                transition={{ duration: 0.35, type: "tween" }}
               />
             )}
-            {/* Spotlight circle behind product */}
+
+            {/* Spotlight */}
             <motion.div
               className="absolute rounded-full"
-              style={{
-                background: `radial-gradient(circle, ${diffColor}40 0%, transparent 70%)`,
-                width: "320px",
-                height: "320px",
-              }}
+              style={{ background: `radial-gradient(circle, ${diffColor}40 0%, transparent 70%)`, width: "320px", height: "320px" }}
               initial={{ scale: 0 }}
               animate={{ scale: 1.2 }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.4, type: "tween", ease: "easeOut" }}
             />
 
-            {/* Burst rays */}
-            {(phase === "burst" || phase === "hold") && (
-              <BurstRays color={diffColor} />
-            )}
+            {(phase === "burst" || phase === "hold") && <BurstRays color={diffColor} />}
+            {(phase === "burst" || phase === "hold") && sparkles.map((s, i) => <Sparkle key={i} {...s} />)}
+            {(phase === "hold" || phase === "exit") && <DifficultyRibbon question={question} />}
+            {(phase === "hold" || phase === "exit") && <ScoreBadge points={question.points} color={diffColor} />}
 
-            {/* Sparkles */}
-            {(phase === "burst" || phase === "hold") &&
-              sparkles.map((s, i) => (
-                <Sparkle key={i} {...s} />
-              ))}
-
-            {/* Difficulty ribbon */}
-            {(phase === "hold" || phase === "exit") && (
-              <DifficultyRibbon question={question} />
-            )}
-
-            {/* Score badge */}
-            {(phase === "hold" || phase === "exit") && (
-              <ScoreBadge points={question.points} color={diffColor} />
-            )}
-
-            {/* Product image — main hero */}
+            {/* Product — tween for multi-keyframe, spring for y only */}
             <motion.div
               className="relative z-10"
               initial={{ scale: 0, y: 120, rotate: -20, opacity: 0 }}
-              animate={{
-                scale: phase === "exit" ? 0.7 : [null, 1.15, 0.95, 1.05, 1],
-                y: 0,
-                rotate: [null, 8, -5, 3, 0],
-                opacity: 1,
-              }}
+              animate={{ scale: phase === "exit" ? 0.7 : 1, y: 0, rotate: 0, opacity: 1 }}
               transition={{
-                scale: { type: "spring", bounce: 0.6, duration: 0.7 },
-                y: { type: "spring", bounce: 0.6, duration: 0.7 },
-                rotate: { duration: 0.8, delay: 0.05 },
-                opacity: { duration: 0.2 },
+                scale: { type: "tween", duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
+                y: { type: "spring", stiffness: 300, damping: 20 },
+                rotate: { type: "tween", duration: 0.6, ease: "easeOut" },
+                opacity: { duration: 0.2, type: "tween" },
               }}
             >
-              <img
-                src={product.url}
-                alt={product.name}
-                className="w-52 h-52 object-contain drop-shadow-2xl"
-                style={{
-                  filter: `drop-shadow(0 12px 24px ${diffColor}60)`,
-                }}
-              />
+              <ProductDisplay product={displayProduct} diffColor={diffColor} />
             </motion.div>
 
-            {/* Glow ring behind product */}
+            {/* Glow ring — tween only */}
             <motion.div
               className="absolute rounded-full pointer-events-none"
-              style={{
-                width: "220px",
-                height: "220px",
-                background: `radial-gradient(circle, ${diffColor}50 0%, transparent 70%)`,
-                zIndex: 9,
-              }}
+              style={{ width: "220px", height: "220px", background: `radial-gradient(circle, ${diffColor}50 0%, transparent 70%)`, zIndex: 9 }}
               initial={{ scale: 0, opacity: 0 }}
               animate={{
-                scale: [null, 1.3, 1.0, 1.2, 1.1],
-                opacity: phase === "exit" ? 0 : [null, 0.8, 0.6, 0.7, 0.6],
+                scale: phase === "exit" ? 0.5 : [0, 1.3, 1.0, 1.2, 1.1],
+                opacity: phase === "exit" ? 0 : [0, 0.8, 0.6, 0.7, 0.6],
               }}
-              transition={{ duration: 1.2, delay: 0.2 }}
+              transition={{ duration: 1.2, delay: 0.2, type: "tween", ease: "easeOut" }}
             />
 
             {/* Product name tag */}
@@ -339,12 +289,14 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
               className="relative z-10 mt-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
+              transition={{ delay: 0.35, type: "tween" }}
             >
               <div className="bg-white rounded-2xl px-6 py-3 shadow-xl border-2 border-[#29ABE2]/30 text-center">
-                <p className="text-4xl mb-1">{product.emoji}</p>
-                <p className="text-[#1a5fa8] font-black text-xl">{product.name}</p>
-                <p className="text-[#29ABE2] text-sm font-bold mt-0.5">已掃描！Scanned!</p>
+                <p className="text-[#1a5fa8] font-black text-xl">{displayProduct.nameZH}</p>
+                {displayProduct.nameEN && displayProduct.nameEN !== displayProduct.nameZH && (
+                  <p className="text-[#29ABE2] text-sm font-bold">{displayProduct.nameEN}</p>
+                )}
+                <p className="text-green-500 text-sm font-bold mt-0.5">✅ 已掃描！Scanned!</p>
               </div>
             </motion.div>
 
@@ -354,23 +306,17 @@ export function ScanTransition({ question, onComplete }: ScanTransitionProps) {
                 className="absolute bottom-16 left-0 right-0 flex justify-center z-20"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
+                transition={{ delay: 0.6, type: "tween" }}
               >
                 <div
                   className="px-8 py-3 rounded-2xl shadow-xl"
-                  style={{
-                    background: `linear-gradient(135deg, ${diffColor}, ${diffColor}cc)`,
-                    boxShadow: `0 8px 24px ${diffColor}60`,
-                  }}
+                  style={{ background: `linear-gradient(135deg, ${diffColor}, ${diffColor}cc)`, boxShadow: `0 8px 24px ${diffColor}60` }}
                 >
-                  <p className="text-white font-black text-xl tracking-wide">
-                    🧠 題目來了！
-                  </p>
+                  <p className="text-white font-black text-xl tracking-wide">🧠 題目來了！</p>
                 </div>
               </motion.div>
             )}
 
-            {/* Checkered floor strip */}
             <div className="absolute bottom-0 left-0 right-0 checkered-floor h-8 opacity-40" />
           </motion.div>
         )}

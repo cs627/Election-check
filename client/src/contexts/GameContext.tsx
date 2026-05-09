@@ -1,6 +1,7 @@
 // ============================================================
 // IES Supermarket Quiz — Game State Context
-// Supports: USB barcode scanner (keyboard input) + mouse click
+// Data-driven: reads products + questions from Excel upload
+// USB barcode scanner support (keyboard buffer)
 // ============================================================
 
 import React, {
@@ -12,11 +13,17 @@ import React, {
   useState,
 } from "react";
 import {
+  DEFAULT_PRODUCTS,
+  GameData,
   LeaderboardEntry,
+  Product,
   Question,
+  findProductByBarcode,
   getRandomQuestion,
+  loadGameData,
   saveToLeaderboard,
-} from "@/lib/gameData";
+} from "@/lib/dataStore";
+import { DEFAULT_QUESTIONS } from "@/lib/defaultQuestions";
 
 export type GameScreen =
   | "home"
@@ -34,6 +41,7 @@ interface GameState {
   timeLeft: number;
   totalTime: number;
   currentQuestion: Question | null;
+  currentProduct: Product | null;    // the scanned product for animation
   selectedAnswer: number | null;
   usedQuestionIds: string[];
   questionsAnswered: number;
@@ -47,40 +55,61 @@ interface GameContextValue extends GameState {
   startGame: () => void;
   goToSettings: () => void;
   goHome: () => void;
-  scanBarcode: () => void;
+  scanBarcode: (barcode?: string) => void;
   finishTransition: () => void;
   selectAnswer: (index: number) => void;
   nextScan: () => void;
   setTotalTime: (seconds: number) => void;
   totalTimeOption: number;
+  // Data management
+  gameData: GameData;
+  reloadData: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
 
 const DEFAULT_TIME = 120;
 
-const INITIAL_STATE: GameState = {
-  screen: "home",
-  score: 0,
-  timeLeft: DEFAULT_TIME,
-  totalTime: DEFAULT_TIME,
-  currentQuestion: null,
-  selectedAnswer: null,
-  usedQuestionIds: [],
-  questionsAnswered: 0,
-  correctAnswers: 0,
-  rank: 0,
-  leaderboardEntry: null,
-  gameStartTime: 0,
-};
+function buildInitialState(totalTime: number): GameState {
+  return {
+    screen: "home",
+    score: 0,
+    timeLeft: totalTime,
+    totalTime,
+    currentQuestion: null,
+    currentProduct: null,
+    selectedAnswer: null,
+    usedQuestionIds: [],
+    questionsAnswered: 0,
+    correctAnswers: 0,
+    rank: 0,
+    leaderboardEntry: null,
+    gameStartTime: 0,
+  };
+}
+
+function getActiveGameData(): GameData {
+  const stored = loadGameData();
+  return stored || {
+    products: DEFAULT_PRODUCTS,
+    questions: DEFAULT_QUESTIONS,
+    loadedAt: 0,
+    fileName: "預設數據",
+  };
+}
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<GameState>(INITIAL_STATE);
   const [totalTimeOption, setTotalTimeOptionState] = useState(DEFAULT_TIME);
+  const [state, setState] = useState<GameState>(() => buildInitialState(DEFAULT_TIME));
+  const [gameData, setGameData] = useState<GameData>(getActiveGameData);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // USB scanner buffer
   const scanBufferRef = useRef<string>("");
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reloadData = useCallback(() => {
+    setGameData(getActiveGameData());
+  }, []);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -89,56 +118,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const endGameNow = useCallback((s: GameState) => {
-    const entry: LeaderboardEntry = {
-      timestamp: s.gameStartTime,
-      score: s.score,
-      duration: s.totalTime,
-      questionsAnswered: s.questionsAnswered,
-      correctAnswers: s.correctAnswers,
-    };
-    const rank = saveToLeaderboard(entry);
-    return { rank, entry };
-  }, []);
-
-  const startTimer = useCallback(
-    (duration: number) => {
-      clearTimer();
-      timerRef.current = setInterval(() => {
-        setState((prev) => {
-          if (prev.screen === "game-over") {
-            clearTimer();
-            return prev;
-          }
-          const newTime = prev.timeLeft - 1;
-          if (newTime <= 0) {
-            clearTimer();
-            const { rank, entry } = endGameNow({ ...prev, timeLeft: 0 });
-            return {
-              ...prev,
-              timeLeft: 0,
-              screen: "game-over",
-              rank,
-              leaderboardEntry: entry,
-            };
-          }
-          return { ...prev, timeLeft: newTime };
-        });
-      }, 1000);
-    },
-    [clearTimer, endGameNow]
-  );
+  const startTimer = useCallback((duration: number) => {
+    clearTimer();
+    timerRef.current = setInterval(() => {
+      setState((prev) => {
+        if (prev.screen === "game-over") { clearTimer(); return prev; }
+        const newTime = prev.timeLeft - 1;
+        if (newTime <= 0) {
+          clearTimer();
+          const entry: LeaderboardEntry = {
+            timestamp: prev.gameStartTime,
+            score: prev.score,
+            duration: prev.totalTime,
+            questionsAnswered: prev.questionsAnswered,
+            correctAnswers: prev.correctAnswers,
+          };
+          const rank = saveToLeaderboard(entry);
+          return { ...prev, timeLeft: 0, screen: "game-over", rank, leaderboardEntry: entry };
+        }
+        return { ...prev, timeLeft: newTime };
+      });
+    }, 1000);
+  }, [clearTimer]);
 
   const startGame = useCallback(() => {
     clearTimer();
     const now = Date.now();
-    setState({
-      ...INITIAL_STATE,
-      screen: "scanning",
-      totalTime: totalTimeOption,
-      timeLeft: totalTimeOption,
-      gameStartTime: now,
-    });
+    setState({ ...buildInitialState(totalTimeOption), screen: "scanning", gameStartTime: now });
     startTimer(totalTimeOption);
   }, [clearTimer, startTimer, totalTimeOption]);
 
@@ -149,23 +155,40 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const goHome = useCallback(() => {
     clearTimer();
-    setState({ ...INITIAL_STATE, totalTime: totalTimeOption, timeLeft: totalTimeOption });
+    setState(buildInitialState(totalTimeOption));
   }, [clearTimer, totalTimeOption]);
 
-  const scanBarcode = useCallback(() => {
+  // scanBarcode: accepts optional barcode string (from USB scanner)
+  // or picks a random product if no barcode given (mouse click simulation)
+  const scanBarcode = useCallback((barcode?: string) => {
     setState((prev) => {
       if (prev.screen !== "scanning") return prev;
-      const question = getRandomQuestion(prev.usedQuestionIds);
+
+      // Find product by barcode or pick random
+      let product: Product | null = null;
+      if (barcode) {
+        product = findProductByBarcode(barcode, gameData.products);
+        if (!product) {
+          // Barcode not found — pick random product
+          product = gameData.products[Math.floor(Math.random() * gameData.products.length)] || null;
+        }
+      } else {
+        // Mouse click simulation: random product
+        product = gameData.products[Math.floor(Math.random() * gameData.products.length)] || null;
+      }
+
+      const question = getRandomQuestion(gameData.questions, prev.usedQuestionIds);
       if (!question) return prev;
-      // Go to transition first, then question
+
       return {
         ...prev,
         screen: "scan-transition",
         currentQuestion: question,
+        currentProduct: product,
         selectedAnswer: null,
       };
     });
-  }, []);
+  }, [gameData]);
 
   const finishTransition = useCallback(() => {
     setState((prev) => {
@@ -193,7 +216,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const nextScan = useCallback(() => {
     setState((prev) => {
       if (prev.timeLeft <= 0) return prev;
-      return { ...prev, screen: "scanning", currentQuestion: null, selectedAnswer: null };
+      return { ...prev, screen: "scanning", currentQuestion: null, currentProduct: null, selectedAnswer: null };
     });
   }, []);
 
@@ -202,43 +225,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, totalTime: seconds, timeLeft: seconds }));
   }, []);
 
-  // ============================================================
-  // USB Barcode Scanner support
-  // USB scanners type characters rapidly then send Enter key.
-  // We buffer keystrokes and trigger scan on Enter.
-  // ============================================================
+  // USB Barcode Scanner keyboard buffer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      // Only active during scanning screen — ignore during transition
-      setState((prev) => prev);
-
       if (e.key === "Enter") {
-        // Scanner completed — trigger scan
         const buf = scanBufferRef.current.trim();
         scanBufferRef.current = "";
         if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
         if (buf.length > 0) {
-          // Trigger barcode scan
           setState((prev) => {
             if (prev.screen !== "scanning") return prev;
-            const question = getRandomQuestion(prev.usedQuestionIds);
-            if (!question) return prev;
-            return {
-              ...prev,
-              screen: "question",
-              currentQuestion: question,
-              selectedAnswer: null,
-            };
+            return prev; // trigger via scanBarcode with barcode
           });
+          // Call scanBarcode with the actual barcode
+          scanBarcode(buf);
         }
       } else if (e.key.length === 1) {
-        // Buffer character
         scanBufferRef.current += e.key;
-        // Auto-clear buffer after 100ms of inactivity (human typing is slower)
         if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
         scanTimerRef.current = setTimeout(() => {
           scanBufferRef.current = "";
@@ -248,11 +254,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [scanBarcode]);
 
-  useEffect(() => {
-    return () => clearTimer();
-  }, [clearTimer]);
+  useEffect(() => () => clearTimer(), [clearTimer]);
 
   return (
     <GameContext.Provider
@@ -267,6 +271,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         nextScan,
         setTotalTime,
         totalTimeOption,
+        gameData,
+        reloadData,
       }}
     >
       {children}
