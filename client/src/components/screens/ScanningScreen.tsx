@@ -10,7 +10,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 
 const SCAN_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/ies-scan-screen-3hvwGZSq4oC2x7i6cTrkM3.webp";
-const MASCOT_HAPPY = "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/ies-mascot-correct-hZ4ckqDbX73rChBL4dnhJG.webp";
+// KV Official Mascot — 藍小寶 (Blue Ballot Box)
+const MASCOT_HAPPY = "/manus-storage/mascot-kv-happy_109923ab.png";
 
 export function ScanningScreen() {
   const { scanBarcode, score, questionsAnswered, correctAnswers } = useGame();

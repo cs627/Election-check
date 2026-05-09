@@ -9,8 +9,9 @@ import { useSounds } from "@/hooks/useSounds";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 
-const MASCOT_CORRECT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/ies-mascot-correct-hZ4ckqDbX73rChBL4dnhJG.webp";
-const MASCOT_WRONG   = "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/ies-mascot-wrong-7iq2jtNgvvcn7kLpc84cE7.webp";
+// KV Official Mascot — 藍小寶 (Blue Ballot Box) — expression-only variants
+const MASCOT_CORRECT = "/manus-storage/mascot-kv-happy_109923ab.png";
+const MASCOT_WRONG   = "/manus-storage/mascot-kv-sad_27a7a776.png";
 
 // Confetti
 function Confetti() {

@@ -5,11 +5,12 @@
 
 import { useGame } from "@/contexts/GameContext";
 import { useSounds } from "@/hooks/useSounds";
-import { formatTimestamp, getLeaderboard } from "@/lib/gameData";
+import { formatTimestamp, getLeaderboard } from "@/lib/dataStore";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-const MASCOT_CORRECT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663437368766/J2Z2DFnF4NuZM2o5YquhpC/ies-mascot-correct-hZ4ckqDbX73rChBL4dnhJG.webp";
+// KV Official Mascot — 藍小寶 (Blue Ballot Box) — happy expression
+const MASCOT_CORRECT = "/manus-storage/mascot-kv-happy_109923ab.png";
 const KV_IMAGE = "/manus-storage/ies-kv_6fd4c960.jpg";
 
 const RANK_MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
