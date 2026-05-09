@@ -1,9 +1,7 @@
 // ============================================================
 // IES Supermarket Quiz — Countdown Timer
-// Large Orbitron display with ticking sound effects:
-//   30-11s: soft clock tick-tock
-//   10-4s:  urgent sharp tick (orange)
-//   3-1s:   loud alarm beep (red + screen flash)
+// KIOSK 9:16 — compact layout, no extra spacing
+// Ticking sounds: 30-11s soft, 10-4s urgent, 3-1s alarm
 // ============================================================
 
 import { useGame } from "@/contexts/GameContext";
@@ -14,17 +12,17 @@ import { motion, AnimatePresence } from "framer-motion";
 export function CountdownTimer({ compact = false }: { compact?: boolean }) {
   const { timeLeft, totalTime, screen } = useGame();
 
-  // Only tick during active game screens (not home/settings/game-over)
-  const isActiveGame = screen === "scanning" || screen === "question" ||
-    screen === "result-correct" || screen === "result-wrong" || screen === "scan-transition";
+  const isActiveGame =
+    screen === "scanning" || screen === "question" ||
+    screen === "result-correct" || screen === "result-wrong" ||
+    screen === "scan-transition";
 
-  // Wire up the ticking sound — fires on every timeLeft change
   useCountdownTick(timeLeft, isActiveGame);
 
   const pct = Math.max(0, (timeLeft / totalTime) * 100);
   const isCritical = timeLeft <= 3 && timeLeft > 0;
-  const isUrgent = timeLeft <= 10 && !isCritical;
-  const isWarning = timeLeft <= 30 && !isUrgent && !isCritical;
+  const isUrgent   = timeLeft <= 10 && !isCritical;
+  const isWarning  = timeLeft <= 30 && !isUrgent && !isCritical;
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -44,15 +42,14 @@ export function CountdownTimer({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full relative">
-
-      {/* Critical flash overlay — full-width red flash on each tick at ≤3s */}
+    <div className="flex flex-col items-center gap-1 w-full relative">
+      {/* Critical flash */}
       <AnimatePresence>
         {isCritical && (
           <motion.div
             key={timeLeft}
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{ backgroundColor: "rgba(239,68,68,0.15)" }}
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{ backgroundColor: "rgba(239,68,68,0.12)" }}
             initial={{ opacity: 0.8 }}
             animate={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
@@ -65,43 +62,30 @@ export function CountdownTimer({ compact = false }: { compact?: boolean }) {
         key={isCritical ? `crit-${timeLeft}` : "timer"}
         className={cn(
           "font-orbitron font-black tabular-nums leading-none select-none",
-          isCritical
-            ? "text-red-600 text-8xl"
-            : isUrgent
-              ? "text-red-500 text-8xl"
-              : isWarning
-                ? "text-orange-500 text-8xl"
-                : "text-[#1a5fa8] text-8xl"
+          isCritical ? "text-red-600 text-7xl" :
+          isUrgent   ? "text-red-500 text-7xl" :
+          isWarning  ? "text-orange-500 text-7xl" :
+          "text-[#1a5fa8] text-7xl"
         )}
         style={
-          isCritical
-            ? { filter: "drop-shadow(0 0 18px rgba(239,68,68,0.9))" }
-            : isUrgent
-              ? { filter: "drop-shadow(0 0 12px rgba(239,68,68,0.6))" }
-              : isWarning
-                ? { filter: "drop-shadow(0 0 8px rgba(249,115,22,0.5))" }
-                : {}
+          isCritical ? { filter: "drop-shadow(0 0 14px rgba(239,68,68,0.8))" } :
+          isUrgent   ? { filter: "drop-shadow(0 0 10px rgba(239,68,68,0.5))" } :
+          isWarning  ? { filter: "drop-shadow(0 0 6px rgba(249,115,22,0.4))" } : {}
         }
-        // Micro-scale pulse on each tick during warning/critical
         animate={
-          isCritical
-            ? { scale: [1, 1.08, 1], transition: { duration: 0.25 } }
-            : isUrgent
-              ? { scale: [1, 1.04, 1], transition: { duration: 0.3 } }
-              : {}
+          isCritical ? { scale: [1, 1.07, 1], transition: { duration: 0.25 } } :
+          isUrgent   ? { scale: [1, 1.03, 1], transition: { duration: 0.3 } } : {}
         }
       >
         {display}
       </motion.div>
 
       {/* Progress bar */}
-      <div className="w-full max-w-xs h-4 bg-white/50 rounded-full overflow-hidden border border-white/60">
+      <div className="w-full max-w-xs h-3 bg-white/50 rounded-full overflow-hidden border border-white/60">
         <motion.div
           className={cn(
             "h-full rounded-full",
-            isCritical ? "bg-red-600" :
-            isUrgent   ? "bg-red-500" :
-            isWarning  ? "bg-orange-400" : "bg-[#29ABE2]"
+            isCritical ? "bg-red-600" : isUrgent ? "bg-red-500" : isWarning ? "bg-orange-400" : "bg-[#29ABE2]"
           )}
           style={{ width: `${pct}%` }}
           animate={isCritical ? { opacity: [1, 0.5, 1] } : {}}
@@ -109,25 +93,18 @@ export function CountdownTimer({ compact = false }: { compact?: boolean }) {
         />
       </div>
 
-      {/* Urgency messages */}
+      {/* Urgency messages — compact */}
       {isCritical && (
         <motion.p
-          className="text-red-600 text-base font-black"
-          animate={{ scale: [1, 1.1, 1] }}
+          className="text-red-600 text-sm font-black leading-none"
+          animate={{ scale: [1, 1.08, 1] }}
           transition={{ duration: 0.5, repeat: Infinity }}
         >
           🚨 最後 {timeLeft} 秒！
         </motion.p>
       )}
       {isUrgent && !isCritical && (
-        <p className="text-red-500 text-sm font-black animate-bounce">
-          ⚠️ 快啲！Hurry up!
-        </p>
-      )}
-      {isWarning && (
-        <p className="text-orange-500 text-xs font-bold">
-          ⏰ 剩餘 {timeLeft} 秒
-        </p>
+        <p className="text-red-500 text-xs font-black animate-bounce leading-none">⚠️ 快啲！Hurry up!</p>
       )}
     </div>
   );

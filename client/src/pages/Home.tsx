@@ -1,8 +1,8 @@
 // ============================================================
 // IES Supermarket Quiz — Main Page (Screen Router)
-// Kiosk portrait layout, max 480px centered
-// Scan → directly to question (no full-screen transition overlay)
-// Admin button (⚙️) in top-right corner for data management
+// KIOSK MODE: Fixed 9:16 viewport, NO page scroll ever.
+// Container: max-width 480px, height = width × 16/9
+// All screens must fit within this fixed box.
 // ============================================================
 
 import { GameOverScreen } from "@/components/screens/GameOverScreen";
@@ -21,8 +21,9 @@ function ScreenRouter() {
   const [showAdmin, setShowAdmin] = useState(false);
 
   return (
-    <div className="relative w-full min-h-screen">
-      {/* Admin button — visible on home/settings screens only */}
+    // This div fills the kiosk box exactly — overflow hidden, no scroll
+    <div className="relative w-full h-full overflow-hidden">
+      {/* Admin button */}
       {(screen === "home" || screen === "settings") && (
         <button
           onClick={() => setShowAdmin(true)}
@@ -32,15 +33,15 @@ function ScreenRouter() {
         </button>
       )}
 
-      {/* Screen router with smooth transitions */}
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -14 }}
-          transition={{ duration: 0.2, type: "tween" }}
-          className="w-full min-h-screen"
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.18, type: "tween" }}
+          // Each screen fills the kiosk box exactly
+          className="absolute inset-0 w-full h-full"
         >
           {screen === "home"           && <HomeScreen />}
           {screen === "settings"       && <SettingsScreen />}
@@ -71,8 +72,30 @@ function ScreenRouter() {
 export default function Home() {
   return (
     <GameProvider>
-      <div className="min-h-screen bg-gray-300 flex justify-center">
-        <div className="w-full max-w-[480px] relative shadow-2xl overflow-hidden">
+      {/*
+        Outer shell: full viewport, dark background, centers the kiosk box.
+        overflow-hidden on body is set via CSS to prevent any page scroll.
+      */}
+      <div
+        className="w-screen h-screen bg-gray-400 flex items-center justify-center overflow-hidden"
+        style={{ touchAction: "none" }}
+      >
+        {/*
+          Kiosk box: fixed 9:16 aspect ratio, max 480px wide.
+          Uses CSS aspect-ratio to maintain 9:16 regardless of screen size.
+          On tall screens (portrait phone/tablet) it fills width.
+          On wide screens (landscape) it's constrained by height.
+        */}
+        <div
+          className="relative bg-white shadow-2xl overflow-hidden"
+          style={{
+            aspectRatio: "9 / 16",
+            width: "min(480px, 100vw, calc(100vh * 9 / 16))",
+            height: "min(calc(480px * 16 / 9), 100vh, calc(100vw * 16 / 9))",
+            maxWidth: "480px",
+            maxHeight: "100vh",
+          }}
+        >
           <ScreenRouter />
         </div>
       </div>

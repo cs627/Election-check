@@ -59,11 +59,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html, body {
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Nunito', sans-serif;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    overscroll-behavior: none;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
